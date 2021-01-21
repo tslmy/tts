@@ -1,3 +1,5 @@
+version: '3.8' # req'd for `pmsipilot/docker-compose-viz` to understand.
+
 services:
   web:
     build: .
@@ -5,5 +7,7 @@ services:
       - "80:80"
     environment:
       - MOZILLATTS_API_URL=http://mozillatts:5002/api/tts
+    depends_on:
+      - mozillatts
   mozillatts:
     image: synesthesiam/mozillatts

@@ -38,6 +38,15 @@ Something to note:
 - The Dockerfile in this repo is for the URL-to-audio web server only. It still requires the [`synesthesiam/docker-mozillatts`][mz] image to be running in a container. Therefore, although you can manually set up the 2 containers, the Docker Compose way is always going to be easier.
 - It uses Gunicorn instead of the vanilla Flask server.
 
+The containers work together like this:
+
+![diagram](docker-compose.png)
+
+Sidenote: The diagram above is generated with this command:
+
+```shell
+docker run --rm -it --name dcv -v $(pwd):/input pmsipilot/docker-compose-viz render -m image docker-compose.yml
+```
 
 ## Usage
 
