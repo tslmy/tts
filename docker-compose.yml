@@ -11,6 +11,6 @@ services:
       - mozillatts
       - cache
   mozillatts:
-    image: synesthesiam/mozillatts
+    build: mozillatts
   cache:
     image: "redis:alpine"
