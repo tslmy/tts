@@ -3,6 +3,7 @@
 from newspaper import Article
 from textblob import TextBlob
 import io
+import os
 import requests
 from tqdm import tqdm
 from flask import Flask, request, send_file
@@ -19,7 +20,10 @@ def getTextFromUrl(url: str) -> str:
     return article.text
 
 
-def getAudioForBlob(blob: TextBlob):
+def getAudioForBlob(blob: TextBlob,
+                    mozillatts_api_url=os.environ.get(
+                        'MOZILLATTS_API_URL',
+                        'http://localhost:5002/api/tts')):
     '''
     Takes a TextBlob object.
     Returns a dictionary from each sentence (TextBlob) to a Pydub Segment.
@@ -27,9 +31,10 @@ def getAudioForBlob(blob: TextBlob):
     sent_to_segments = dict()
     with tqdm(blob.sentences, desc='Sentences') as pbar:
         for sentence in pbar:
+            sentence_str = str(sentence).replace('\n', '. ').encode('utf-8')
             resp = requests.post(
-                'http://localhost:5002/api/tts',
-                data=str(sentence).replace('\n', '. ').encode('utf-8'))
+                mozillatts_api_url,
+                data=sentence_str)
             if resp.status_code != requests.codes.ok:
                 print(f'Failed at "{sentence}": {resp.status_code}: {resp.reason}')
                 continue
@@ -77,16 +82,5 @@ def tts():
     return send_file(wav_bytes, mimetype='audio/wav')
 
 
-def main():
-    '''
-    To test, use:
-    curl -G --output - \
-        --data-urlencode 'url=https://sjmulder.nl/en/' \
-        'http://localhost:5000/' | \
-        play -
-    '''
-    app.run(host='0.0.0.0')
-
-
 if __name__ == '__main__':
-    main()
+    app.run(host='127.0.0.1')

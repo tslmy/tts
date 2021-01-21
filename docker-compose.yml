@@ -1,0 +1,9 @@
+services:
+  web:
+    build: .
+    ports:
+      - "80:80"
+    environment:
+      - MOZILLATTS_API_URL=http://mozillatts:5002/api/tts
+  mozillatts:
+    image: synesthesiam/mozillatts
