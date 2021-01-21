@@ -11,12 +11,11 @@ This is my own scrambled-up TTS Service.
 1. Run [synesthesiam/docker-mozillatts][mz]: `docker run -it -p 5002:5002 synesthesiam/mozillatts`.
 2. Create a conda env: `conda env create -n tts -f conda-requirements.txt -y`.
 3. Activate the env: `conda activate tts`.
-4. Start the server. There are different ways to do it:
-  - Using the **dev** server from [Flask][fl]: `FLASK_APP=main.py FLASK_ENV=development flask run`.
-    - Note: Although Flask does have a production mode, it is still [not recommended][nr] for production use. For that, we use...
-  - Using the **prod** server from [Gunicorn][gu]: `gunicorn main:app --bind 0.0.0.0:80 --timeout 3600`.
-    - As seen in the `--timeout` option, a request allowed to run for 1h only. Very large text, therefore, may fail.
-
+5. Start the server. There are different ways to do it:
+   - Using the **dev** server from [Flask][fl]: `FLASK_APP=main.py FLASK_ENV=development flask run`.
+     - Note: Although Flask does have a production mode, it is still [not recommended][nr] for production use. For that, we use...
+   - Using the **prod** server from [Gunicorn][gu]: `gunicorn main:app --bind 0.0.0.0:80 --timeout 3600`.
+     - As seen in the `--timeout` option, a request allowed to run for 1h only. Very large text, therefore, may fail.
 [mf]: https://github.com/conda-forge/miniforge#mambaforge
 [mz]: https://github.com/synesthesiam/docker-mozillatts
 [fl]: https://flask.palletsprojects.com/en/1.1.x/
