@@ -15,7 +15,6 @@ This is my own scrambled-up TTS Service.
  - Using the **dev** server from [Flask][fl]: `FLASK_APP=main.py FLASK_ENV=development flask run`.
    - Note: Although Flask does have a production mode, it is still [not recommended][nr] for production use. For that, we use...
  - Using the **prod** server from [Gunicorn][gu]: `gunicorn main:app --bind 0.0.0.0:80 --timeout 3600`.
-   - 
    - As seen in the `--timeout` option, a request allowed to run for 1h only. Very large text, therefore, may fail.
 
 [mf]: https://github.com/conda-forge/miniforge#mambaforge
