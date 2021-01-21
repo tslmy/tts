@@ -8,6 +8,16 @@ import requests
 from tqdm import tqdm
 from flask import Flask, request, send_file
 from pydub import AudioSegment
+from flask_caching import Cache
+
+
+app = Flask(__name__)
+cache = Cache(app, config={
+    'CACHE_TYPE': 'redis',
+    'CACHE_REDIS_HOST': 'cache',
+})
+
+silence = AudioSegment.silent(duration=400)  # in ms
 
 
 def getTextFromUrl(url: str) -> str:
@@ -20,10 +30,22 @@ def getTextFromUrl(url: str) -> str:
     return article.text
 
 
-def getAudioForBlob(blob: TextBlob,
-                    mozillatts_api_url=os.environ.get(
-                        'MOZILLATTS_API_URL',
-                        'http://localhost:5002/api/tts')):
+@cache.memoize()
+def getAudioForSentence(sentence,
+                        mozillatts_api_url=os.environ.get(
+                            'MOZILLATTS_API_URL',
+                            'http://localhost:5002/api/tts')):
+    sentence_str = str(sentence).replace('\n', '. ').encode('utf-8')
+    resp = requests.post(
+        mozillatts_api_url,
+        data=sentence_str)
+    assert resp.status_code == requests.codes.ok
+    # print(f'Failed at "{sentence}": {resp.status_code}: {resp.reason}')
+    # else:
+    return resp.content
+
+
+def getAudioForBlob(blob: TextBlob):
     '''
     Takes a TextBlob object.
     Returns a dictionary from each sentence (TextBlob) to a Pydub Segment.
@@ -31,15 +53,7 @@ def getAudioForBlob(blob: TextBlob,
     sent_to_segments = dict()
     with tqdm(blob.sentences, desc='Sentences') as pbar:
         for sentence in pbar:
-            sentence_str = str(sentence).replace('\n', '. ').encode('utf-8')
-            resp = requests.post(
-                mozillatts_api_url,
-                data=sentence_str)
-            if resp.status_code != requests.codes.ok:
-                print(f'Failed at "{sentence}": {resp.status_code}: {resp.reason}')
-                continue
-            # else:
-            wave_bytes = resp.content
+            wave_bytes = getAudioForSentence(sentence)
 
             # Convert to Segment.
             wave_file_io = io.BytesIO(wave_bytes)
@@ -63,10 +77,6 @@ def convertSegmentToWavBytes(segment: AudioSegment):
     # return its content:
     out_bytes.seek(0)
     return out_bytes
-
-
-app = Flask(__name__)
-silence = AudioSegment.silent(duration=400)  # in ms
 
 
 @app.route('/', methods=['GET'])

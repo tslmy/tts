@@ -9,5 +9,8 @@ services:
       - MOZILLATTS_API_URL=http://mozillatts:5002/api/tts
     depends_on:
       - mozillatts
+      - cache
   mozillatts:
     image: synesthesiam/mozillatts
+  cache:
+    image: "redis:alpine"
