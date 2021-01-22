@@ -7,6 +7,8 @@ services:
       - "80:80"
     environment:
       - MOZILLATTS_API_URL=http://mozillatts:5002/api/tts
+      - REDIS_HOST=cache
+      - REDIS_PORT=6379
     depends_on:
       - mozillatts
       - cache
@@ -14,3 +16,5 @@ services:
     build: mozillatts
   cache:
     image: "redis:alpine"
+    volumes:
+      - ./redis_conf:/usr/local/etc/redis

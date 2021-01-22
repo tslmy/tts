@@ -1,18 +1,37 @@
 #!flask/bin/python
 
 from newspaper import Article
+from pydub import AudioSegment
+from sanic import Sanic, response
+from sanic_redis import SanicRedis
 from textblob import TextBlob
+from tqdm import tqdm
+import aiohttp
+import asyncio
 import io
 import os
-from tqdm import tqdm
-from sanic import Sanic, response
-from pydub import AudioSegment
-import asyncio
-import aiohttp
 
+# Read Redis parameters from env vars:
+redis_host = os.environ.get(
+    'REDIS_HOST',
+    'localhost')
+redis_port = os.environ.get(
+    'REDIS_PORT',
+    6379)
+redis_port = int(redis_port)
 
+# Initiate the Sanic web application:
 app = Sanic(__name__)
+app.config.update(
+    {
+        'REDIS': {
+            'address': (redis_host, redis_port),
+        },
+    },
+)
+redis = SanicRedis(app)
 
+# This will be used repeatedly in assembly.
 silence = AudioSegment.silent(duration=400)  # in ms
 
 
@@ -26,18 +45,33 @@ def getTextFromUrl(url: str) -> str:
     return article.text
 
 
-async def getAudioForSentence(sentence: str, client,
-                              mozillatts_api_url=os.environ.get(
-                                  'MOZILLATTS_API_URL',
-                                  'http://localhost:5002/api/tts')):
+async def generateAudioForSentence(sentence: str, client,
+                                   mozillatts_api_url=os.environ.get(
+                                       'MOZILLATTS_API_URL',
+                                       'http://localhost:5002/api/tts')):
+    '''
+    Calls the TTS service to generate a piece of audio for the given text.
+    '''
     async with client.post(mozillatts_api_url, data=sentence) as resp:
         assert resp.status == 200
         # Get WAV as binary.
         wave_bytes = await resp.content.read()
-        # Convert to Segment.
-        wave_file_io = io.BytesIO(wave_bytes)
-        segment = AudioSegment.from_file(wave_file_io, format="wav")
-        return sentence, segment
+    return wave_bytes
+
+
+async def getAudioForSentence(sentence: str, client):
+    # Check if the wave bytes exist in the cache:
+    with await redis.conn as r:
+        wave_bytes = await r.get(sentence)
+    if wave_bytes is None:
+        wave_bytes = await generateAudioForSentence(sentence, client)
+        # Save to cache:
+        with await redis.conn as r:
+            await r.set(sentence, wave_bytes)
+    # Convert to Segment.
+    wave_file_io = io.BytesIO(wave_bytes)
+    segment = AudioSegment.from_file(wave_file_io, format="wav")
+    return sentence, segment
 
 
 def sanitize(sentence) -> str:
