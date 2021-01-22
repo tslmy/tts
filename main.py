@@ -5,17 +5,13 @@ from textblob import TextBlob
 import io
 import os
 from tqdm import tqdm
-from flask import Flask, request, send_file
+from sanic import Sanic, response
 from pydub import AudioSegment
-from flask_caching import Cache
 import asyncio
 import aiohttp
 
-app = Flask(__name__)
-cache = Cache(app, config={
-    'CACHE_TYPE': 'redis',
-    'CACHE_REDIS_HOST': 'cache',
-})
+
+app = Sanic(__name__)
 
 silence = AudioSegment.silent(duration=400)  # in ms
 
@@ -30,7 +26,6 @@ def getTextFromUrl(url: str) -> str:
     return article.text
 
 
-@cache.memoize()
 async def getAudioForSentence(sentence: str, client,
                               mozillatts_api_url=os.environ.get(
                                   'MOZILLATTS_API_URL',
@@ -83,20 +78,18 @@ def convertSegmentToWavBytes(segment: AudioSegment):
 
 
 @app.route('/', methods=['GET'])
-def tts():
+async def tts(request):
     url = request.args.get('url')
     print(f"URL input: {url}")
 
     text = getTextFromUrl(url)
     blob = TextBlob(text)
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    sent_to_segments = loop.run_until_complete(getAudioForBlob(blob))
+    sent_to_segments = await getAudioForBlob(blob)
 
     playlist = combineSegmentsForBlobIntoWav(sent_to_segments, blob)
     wav_bytes = convertSegmentToWavBytes(playlist)
-    return send_file(wav_bytes, mimetype='audio/wav')
+    return response.raw(wav_bytes.read(), content_type='audio/wav')
 
 
 if __name__ == '__main__':

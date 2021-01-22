@@ -11,19 +11,18 @@ Given a URL, this service return an audio file / stream (in WAV format) that rea
 1. Run [`synesthesiam/docker-mozillatts`][mz]: `docker run -it -p 5002:5002 synesthesiam/mozillatts`.
 2. Create a conda env: `conda env create -n tts -f conda-requirements.txt -y`.
 3. Activate the env: `conda activate tts`.
-5. Start the server. There are different ways to do it:
-   - Using the **dev** server from [Flask][fl]: `FLASK_APP=main.py FLASK_ENV=development flask run`.
-     - Note: Although Flask does have a production mode, it is still [not recommended][nr] for production use. For that, we use...
-   - Using the **prod** server from [Gunicorn][gu]: `gunicorn main:app --bind 0.0.0.0:80 --timeout 3600`.
-     - As seen in the `--timeout` option, a request allowed to run for 1h only. Very large text, therefore, may fail.
-
+5. Start the server with [Gunicorn][gu]: `gunicorn main:app --bind 0.0.0.0:80 --timeout 3600 --worker-class sanic.worker.GunicornWorker`.
+   - I don't use the HTTP server that comes with [Sanic][sn], because [macOS complains][mc] "The process has forked and you cannot use this CoreFoundation functionality safely".
+   - As seen in the `--timeout` option, a request allowed to run for 1h only. Very large text, therefore, may fail.
+   - I migrated from [Flask][fl] to [Sanic][sn] because [Sanic][sn] natively supports async view functions, which saves me from interacting with `asyncio.get_event_loop()`.
 
 
 [mf]: https://github.com/conda-forge/miniforge#mambaforge
 [mz]: https://github.com/synesthesiam/docker-mozillatts
+[mc]: https://stackoverflow.com/a/62615386/1147061
 [fl]: https://flask.palletsprojects.com/en/1.1.x/
-[nr]: https://flask.palletsprojects.com/en/1.1.x/deploying/
 [gu]: https://gunicorn.org/
+[sn]: https://sanicframework.org/
 
 ### To run with Docker
 
@@ -36,7 +35,7 @@ docker-compose up --build
 Something to note:
 
 - The Dockerfile in this repo is for the URL-to-audio web server only. It still requires the [`synesthesiam/docker-mozillatts`][mz] image to be running in a container. Therefore, although you can manually set up the 2 containers, the Docker Compose way is always going to be easier.
-- It uses Gunicorn instead of the vanilla Flask server.
+- It uses Gunicorn instead of the vanilla Sanic HTTP server.
 
 The containers work together like this:
 
@@ -69,7 +68,7 @@ Of course, you can always save the returned audio as a file and work from there.
 
 Here's a list of future features and tasks:
 
-- [ ] Investigate why `aiohttp` calls to the [`synesthesiam/docker-mozillatts`][mz] would fail (See the Notebook).
+- [x] Investigate why `aiohttp` calls to the [`synesthesiam/docker-mozillatts`][mz] would fail (See the Notebook).
 - [ ] Make `.lrc` lyrics or subtitles to go with the audio file.
 - [ ] Make the speech read out different formats with different audio clues. For example:
   - bolded text can be read with emphasis or notification sounds, 
