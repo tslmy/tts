@@ -4,12 +4,12 @@ from newspaper import Article
 from textblob import TextBlob
 import io
 import os
-import requests
 from tqdm import tqdm
 from flask import Flask, request, send_file
 from pydub import AudioSegment
 from flask_caching import Cache
-
+import asyncio
+import aiohttp
 
 app = Flask(__name__)
 cache = Cache(app, config={
@@ -31,41 +31,44 @@ def getTextFromUrl(url: str) -> str:
 
 
 @cache.memoize()
-def getAudioForSentence(sentence,
-                        mozillatts_api_url=os.environ.get(
-                            'MOZILLATTS_API_URL',
-                            'http://localhost:5002/api/tts')):
-    sentence_str = str(sentence).replace('\n', '. ').encode('utf-8')
-    resp = requests.post(
-        mozillatts_api_url,
-        data=sentence_str)
-    assert resp.status_code == requests.codes.ok
-    # print(f'Failed at "{sentence}": {resp.status_code}: {resp.reason}')
-    # else:
-    return resp.content
+async def getAudioForSentence(sentence: str, client,
+                              mozillatts_api_url=os.environ.get(
+                                  'MOZILLATTS_API_URL',
+                                  'http://localhost:5002/api/tts')):
+    async with client.post(mozillatts_api_url, data=sentence) as resp:
+        assert resp.status == 200
+        # Get WAV as binary.
+        wave_bytes = await resp.content.read()
+        # Convert to Segment.
+        wave_file_io = io.BytesIO(wave_bytes)
+        segment = AudioSegment.from_file(wave_file_io, format="wav")
+        return sentence, segment
 
 
-def getAudioForBlob(blob: TextBlob):
+def sanitize(sentence) -> str:
+    return str(sentence).replace('\n', '. ').encode('utf-8')
+
+
+async def getAudioForBlob(blob: TextBlob):
     '''
     Takes a TextBlob object.
     Returns a dictionary from each sentence (TextBlob) to a Pydub Segment.
     '''
-    sent_to_segments = dict()
-    with tqdm(blob.sentences, desc='Sentences') as pbar:
-        for sentence in pbar:
-            wave_bytes = getAudioForSentence(sentence)
-
-            # Convert to Segment.
-            wave_file_io = io.BytesIO(wave_bytes)
-            segment = AudioSegment.from_file(wave_file_io, format="wav")
-            sent_to_segments[str(sentence)] = segment
-    return sent_to_segments
+    async with aiohttp.ClientSession() as client:
+        futures = []
+        for sentence in blob.sentences:
+            sentence_str = sanitize(sentence)
+            future = getAudioForSentence(sentence_str, client)
+            futures.append(future)
+        responses = await asyncio.gather(*futures)
+        sent_to_segments = {sent: seg for sent, seg in responses}
+        return sent_to_segments
 
 
 def combineSegmentsForBlobIntoWav(sent_to_segments, blob) -> AudioSegment:
     playlist = AudioSegment.empty()
     for sentence in blob.sentences:
-        segment = sent_to_segments[str(sentence)]
+        segment = sent_to_segments[sanitize(sentence)]
         playlist += segment + silence
     return playlist
 
@@ -86,7 +89,11 @@ def tts():
 
     text = getTextFromUrl(url)
     blob = TextBlob(text)
-    sent_to_segments = getAudioForBlob(blob)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    sent_to_segments = loop.run_until_complete(getAudioForBlob(blob))
+
     playlist = combineSegmentsForBlobIntoWav(sent_to_segments, blob)
     wav_bytes = convertSegmentToWavBytes(playlist)
     return send_file(wav_bytes, mimetype='audio/wav')
