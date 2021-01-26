@@ -1,5 +1,7 @@
 # Webpage-to-Speech
 
+[![HitCount](http://hits.dwyl.com/tslmy/tts.svg)](http://hits.dwyl.com/tslmy/tts)
+
 Given a URL, this service return an audio file / stream (in WAV format) that reads out the main content of the webpage.
 
 
